@@ -1,12 +1,23 @@
 import { HttpException, Injectable } from '@nestjs/common';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { UpdateUserDto } from '../dto/update-user.dto';
-import { Repository } from 'typeorm';
+import { DeleteResult, Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 
+interface UserServiceInterface {
+  create(createUserDto: CreateUserDto): Promise<User>;
+  findAll(): Promise<{
+    users: User[];
+    count: number;
+  }>;
+  findOne(id: string): Promise<User>;
+  update(id: string, updateUserDto: UpdateUserDto): Promise<User>;
+  remove(id: string): Promise<DeleteResult>;
+}
+
 @Injectable()
-export class UserService {
+export class UserService implements UserServiceInterface {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -15,7 +26,7 @@ export class UserService {
   async create(createUserDto: CreateUserDto) {
     try {
       const user = await this.userRepository.save(createUserDto);
-      return this.findOne(user.id);
+      return this.getUser(user.id);
     } catch (error) {}
   }
 
@@ -31,11 +42,7 @@ export class UserService {
   }
 
   async findOne(id: string) {
-    const user = await this.userRepository.findOne({ where: { id } });
-    if (!user) {
-      throw new HttpException('User not found', 404);
-    }
-    return user;
+    return this.getUser(id);
   }
 
   async update(id: string, updateUserDto: UpdateUserDto) {
@@ -44,10 +51,22 @@ export class UserService {
       throw new HttpException('User not found', 404);
     }
     await this.userRepository.update(id, { ...updateUserDto });
-    return this.findOne(id);
+    return this.getUser(id);
   }
 
-  remove(id: string) {
+  async remove(id: string) {
+    const user = await this.userRepository.findOne({ where: { id } });
+    if (!user) {
+      throw new HttpException('User not found', 404);
+    }
     return this.userRepository.delete({ id: id });
+  }
+
+  private async getUser(id: string) {
+    const user = await this.userRepository.findOne({ where: { id } });
+    if (!user) {
+      throw new HttpException('User not found', 404);
+    }
+    return user;
   }
 }
